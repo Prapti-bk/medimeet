@@ -1,0 +1,181 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  clerkUserId       String    @unique // Clerk's user ID
+  email             String    @unique
+  name              String?
+  imageUrl          String?
+  role              UserRole  @default(UNASSIGNED) // UNASSIGNED, PATIENT, DOCTOR, ADMIN
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Patient-specific fields
+  credits           Int       @default(2) // Accumulated credit balance
+  
+  // Doctor-specific fields
+  specialty         String?
+  experience        Int?      // Years of experience
+  credentialUrl     String?   // Document URL
+  description       String?   @db.Text
+  verificationStatus VerificationStatus?  @default(PENDING)
+  
+  // Relations
+  patientAppointments Appointment[] @relation("PatientAppointments")
+  doctorAppointments  Appointment[] @relation("DoctorAppointments")
+  availabilities      Availability[]
+  transactions        CreditTransaction[]
+  payouts             Payout[]
+  wellnessLogs        WellnessLog[]
+}
+
+enum UserRole {
+  UNASSIGNED
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model Availability {
+  id        String   @id @default(uuid())
+  doctorId  String
+  doctor    User     @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  startTime DateTime
+  endTime   DateTime
+  status    SlotStatus @default(AVAILABLE)
+  
+  @@index([doctorId, startTime])
+}
+
+enum SlotStatus {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+}
+
+model Appointment {
+  id                String   @id @default(uuid())
+  patientId         String
+  patient           User     @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctorId          String
+  doctor            User     @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  startTime         DateTime // Start time of appointment
+  endTime           DateTime // End time of appointment
+  status            AppointmentStatus @default(SCHEDULED)
+  notes             String?  @db.Text
+  patientDescription String? @db.Text
+    
+  // Video session fields
+  videoSessionId    String?  // Vonage Video API Session ID
+  videoSessionToken String?  // Optional: Can store tokens if needed
+
+  // Doctor's progress note for the patient (visible on patient dashboard)
+  patientProgress   String?  @db.Text
+
+  // Email reminder fields
+  patientEmail      String?  // Clerk login email — stored at booking time
+  reminderSent      Boolean  @default(false)  // Prevents duplicate reminders
+  reminderSentAt    DateTime?                 // Timestamp of last reminder sent
+  reminderType      String?  // "24h" | "1h" | "15m" — last reminder type sent
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status, startTime])
+  @@index([doctorId, startTime])
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model CreditTransaction {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount            Int      // Positive for additions, negative for usage
+  type              TransactionType
+  packageId         String?  // Reference to which package was purchased
+  createdAt         DateTime @default(now())
+}
+
+enum TransactionType {
+  CREDIT_PURCHASE     // Credits purchased through Clerk Billing
+  APPOINTMENT_DEDUCTION // Credit used for appointment
+  ADMIN_ADJUSTMENT      // Manual adjustment by admin
+}
+
+model Payout {
+  id              String        @id @default(uuid())
+  doctorId        String
+  doctor          User          @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  amount          Float
+  credits         Int
+  platformFee     Float
+  netAmount       Float
+  paypalEmail     String
+  status          PayoutStatus  @default(PROCESSING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  processedAt     DateTime?
+  processedBy     String?
+
+  @@index([status, createdAt])
+  @@index([doctorId, status])
+}
+
+enum PayoutStatus {
+  PROCESSING
+  PROCESSED
+}
+
+// ── AI Wellness Tracker ────────────────────────────────────────────────────
+model WellnessLog {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date            DateTime @default(now())
+
+  // Vitals
+  waterIntake     Float?   // litres
+  sleepHours      Float?
+  steps           Int?
+  exerciseMinutes Int?
+  calories        Int?
+  weight          Float?   // kg
+  systolic        Int?     // BP systolic
+  diastolic       Int?     // BP diastolic
+  sugarLevel      Float?   // mg/dL
+
+  // Subjective
+  mood            String?  // emoji key: great/good/okay/bad/terrible
+  energyLevel     Int?     // 1-10
+  stressLevel     Int?     // 1-10
+  symptoms        String[] // free tags
+  medications     String[] // free tags
+  notes           String?  @db.Text
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, date])
+}
