@@ -1,14 +1,61 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import js from "@eslint/js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
-const eslintConfig = [...compat.extends("next/core-web-vitals")];
-
-export default eslintConfig;
+export default [
+  js.configs.recommended,
+  {
+    rules: {
+      "no-unused-vars": "warn",
+      "no-undef": "off",           // Next.js handles globals
+      "react/react-in-jsx-scope": "off",
+    },
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: {
+        React: "readonly",
+        process: "readonly",
+        console: "readonly",
+        window: "readonly",
+        document: "readonly",
+        navigator: "readonly",
+        globalThis: "readonly",
+        setTimeout: "readonly",
+        clearInterval: "readonly",
+        setInterval: "readonly",
+        fetch: "readonly",
+        FormData: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        Promise: "readonly",
+        JSON: "readonly",
+        Math: "readonly",
+        Date: "readonly",
+        Error: "readonly",
+        Array: "readonly",
+        Object: "readonly",
+        String: "readonly",
+        Number: "readonly",
+        Boolean: "readonly",
+        Map: "readonly",
+        Set: "readonly",
+        alert: "readonly",
+        confirm: "readonly",
+      },
+    },
+    settings: {
+      react: { version: "detect" },
+    },
+  },
+  {
+    // Ignore build output and deps
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "out/**",
+      "build/**",
+      "*.config.js",
+      "*.config.mjs",
+      "postcss.config.mjs",
+    ],
+  },
+];

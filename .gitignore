@@ -46,3 +46,5 @@ lib/private.key
 # stale scaffold folders
 clerk-nextjs/
 /.clerk/
+
+.vercel
